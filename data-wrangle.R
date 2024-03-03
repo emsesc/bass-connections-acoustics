@@ -13,11 +13,12 @@ files <- list.files(path = directory, pattern = "\\.csv$", full.names = TRUE)
 process_file <- function(file_path) {
   # Read CSV file
   data <- read.csv(file_path)
+  data <- data[data$site != "training", ]
   
   # Summarize presence of 1 in data columns (excluding site and site_id)
   presence_summary <- data %>%
     select(-site, -siteId) %>%
-    mutate(presence = if_else(rowSums(. == 1, na.rm = TRUE) > 0, 1, 0)) %>%
+    mutate(presence = if_else(rowSums(., na.rm = TRUE) > 0, 1, 0)) %>%
     pull(presence)
   
   # Get the filename without extension
@@ -46,3 +47,4 @@ for (file_path in files) {
 }
 
 print(merged_result)
+
