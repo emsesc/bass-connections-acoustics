@@ -47,4 +47,5 @@ for (file_path in files) {
 }
 
 print(merged_result)
+write.csv(merged_result,file='./merged-occupancy.csv')
 
