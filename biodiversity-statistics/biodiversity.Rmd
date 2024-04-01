@@ -34,17 +34,17 @@ Number of Species at Each Site
 
 ```{r}
 species_count <- AllVars %>%
-  select(Total_Species, total_Owls, Total_mammals, total_WP, deployment_id.x)
+  select(Total_Species, total_Owls, Total_mammals, total_WP, site)
 ```
 
 Total Number of Species
 
 ```{r}
 # Calculate the sum of selected columns
-species_numbers <- colSums(species)
+species_numbers <- as.data.frame(colSums(species))
 ```
 
-Significant Difference by Division
+Significant Difference by Division (add box plot)
 
 *Compute ANVOA*
 
@@ -56,11 +56,37 @@ res.aov
 summary(aov(Total_Species ~ division, data = AllVars))
 ```
 
-Significant Correlation with trail distance
+```{r}
+# Load the ggplot2 library
+library(ggplot2)
+
+# Assuming your data frame is named AllVars, and the variables are Division and Total_Species
+# Replace "YourDataFrame" with the name of your actual data frame
+
+# Create the box plot
+ggplot(AllVars, aes(x = division, y = Total_Species)) +
+  geom_boxplot(fill = "skyblue", color = "blue") +
+  labs(title = "Box Plot of Total Species by Division",
+       x = "Division",
+       y = "Total Species")
+```
+
+Significant Correlation with trail distance (scatter plot)
 
 *Log model*
 
 ```{r}
 log.glm = glm(Total_Species ~ NEAR_DIST_DFTrails+NEAR_STREAM, family=gaussian(link="log"), data=AllVars)
 summary(log.glm)
+```
+
+```{r}
+# Scatter plot of Total_Species against NEAR_DIST_DFTrails
+plot(AllVars$NEAR_DIST_DFTrails, AllVars$Total_Species, 
+     xlab = "NEAR_DIST_DFTrails", ylab = "Total_Species", 
+     main = "Scatter plot with Fitted Line")
+
+# Add the fitted line
+abline(log.glm$coefficients["(Intercept)"], log.glm$coefficients["NEAR_DIST_DFTrails"], 
+       col = "red")
 ```
