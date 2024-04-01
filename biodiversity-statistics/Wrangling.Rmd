@@ -1,0 +1,157 @@
+---
+title: "Frogs"
+author: "Caroline"
+date: "2024-03-18"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(ggplot2)  # my FAVORITE data visualization package
+library(dplyr)    # a set of packages for data manipulation and management
+library(caret)    # package for classification and regression, Machine Learning
+library(lattice)  # a graphics package
+library(blorr)    # a package for linear modeling
+library(lmtest)   # lmtest contains a bunch of linear model tests, as well as the likelihood ratio test that we will use here\
+library(car) #for logging
+
+```
+```{r, reading in the files}
+Frogs <- read.csv("./CSV/AllFrogs_325.csv")
+WaterVars <- read.csv("./CSV/ALLwater_Table.csv")
+CTRichness <- read.csv("./CSV/CT_binaryrichness.csv")
+Piciformes <- read.csv("./CSV/Piciformes.csv")
+Vars <- read.csv("./CSV/Site_Variables.csv")
+```
+
+```{r, wrangling variables}
+CTRichness <- CTRichness %>% 
+  rename (site = sampling_point)
+
+WaterVars <- WaterVars %>% 
+  rename (site = sampling_point)
+
+CTRich <- CTRichness %>% 
+  filter(site %in% c("12", "18", "2", "21", "22", "26", "28", "29", "30", "31", "37", "39", "41", "46", "48", "50", "56", "60", "65", "73", "9"))
+
+Water <- WaterVars %>% 
+  filter(site %in% c("12", "18", "2", "21", "22", "26", "28", "29", "30", "31", "37", "39", "41", "46", "48", "50", "56", "60", "65", "73", "9"))
+
+Vars <- Vars %>% 
+  filter(site != "28")
+```
+
+
+```{r, birds}
+summary(Piciformes)
+
+PiciformesC <- Piciformes %>%
+  group_by(site) %>%
+  summarise(
+    Colaptes.auratus = ifelse(any(Colaptes.auratus == 1), "present", "absent"),
+    Dryobates.pubescens = ifelse(any(Dryobates.pubescens == 1), "present", "absent"),
+    Dryocopus.pileatus = ifelse(any(Dryocopus.pileatus == 1), "present", "absent"),
+    Melanerpes.carolinus = ifelse(any(Melanerpes.carolinus == 1), "present", "absent"),
+    Picoides.villosus = ifelse(any(Picoides.villosus == 1), "present", "absent"),
+    Sphyrapicus.varius = ifelse(any(Sphyrapicus.varius == 1), "present", "absent")
+  )
+
+PiciformesSites <- PiciformesC %>% 
+  filter(site != "training", site != "Site_49", site != "Site_36", site != "Site_62", site != "Site_38", site != "HT_12", site != "HT_C1", site != "HT_C2", site != "HT_G4", site != "HT_G48_1", site != "HT_G48_2", site != "HT_G8", site != "HT_G9", site != "Site_28", site != "Site_3", site != "Site_43", site != "Site_64")
+
+```
+
+```{r, wrangling toads}
+
+Frogs <- Frogs %>% 
+  mutate(across(everything(), ~ifelse(is.na(.), 0, .)))
+
+FrogsC <- Frogs %>% 
+  group_by(site) %>%
+  summarise(
+    Acris.crepitans = ifelse(any(Acris.crepitans == 1), "present", "absent"),
+    Hyla.chrysoscelis = ifelse(any(Hyla.chrysoscelis == 1), "present", "absent"),
+    Anaxyrus.americanus = ifelse(any(Anaxyrus.americanus == 1), "present", "absent"),
+    Lithobates.sphenocephalus = ifelse(any(Lithobates.sphenocephalus == 1), "present", "absent"),
+    Pseudacris.crucifer = ifelse(any(Pseudacris.crucifer == 1), "present", "absent"),
+   Pseudacris.feriarum = ifelse(any(Pseudacris.feriarum == 1), "present", "absent")
+  )
+
+FrogsSites <- FrogsC %>% 
+  filter(site != "training", site != "Site_49", site != "Site_36", site != "Site_62", site != "Site_38", site != "HT_12", site != "HT_C1", site != "HT_C2", site != "HT_G4", site != "HT_G48_1", site != "HT_G48_2", site != "HT_G8", site != "HT_G9", site != "Site_28", site != "Site_3", site != "Site_43", site != "Site_64")
+
+```
+
+```{r, back to binary and new column with total frogs}
+FrogsSites <- FrogsSites %>%
+  mutate_all(~ ifelse(. == "present", 1, ifelse(. == "absent", 0, .)))
+
+
+# Convert species columns to numeric
+FrogsClean <- FrogsSites %>%
+  mutate(across(c(Pseudacris.crucifer, Pseudacris.feriarum, Anaxyrus.americanus, Hyla.chrysoscelis, Lithobates.sphenocephalus, Acris.crepitans), as.numeric))
+
+# Add a new column "total_species" that calculates the total number of species for each site
+FrogsClean <- FrogsClean %>%
+  mutate(total_frogs = rowSums(select(., Acris.crepitans:Pseudacris.feriarum)))
+
+write.csv(FrogsClean, "./CSV/FrogsClean.csv", row.names = FALSE)
+
+```
+
+
+```{r, back to binary and new column with total Woodpeckers}
+PiciformesSites <- PiciformesSites %>%
+  mutate_all(~ ifelse(. == "present", 1, ifelse(. == "absent", 0, .)))
+
+
+# Convert species columns to numeric
+WPClean <- PiciformesSites %>%
+  mutate(across(c(Colaptes.auratus, Dryobates.pubescens, Dryocopus.pileatus, Melanerpes.carolinus, Picoides.villosus, Sphyrapicus.varius), as.numeric))
+
+# Add a new column "total_species" that calculates the total number of species for each site
+WPClean <- WPClean %>%
+  mutate(total_WP = rowSums(select(., Colaptes.auratus:Sphyrapicus.varius)))
+
+write.csv(WPClean, "./CSV/WPClean.csv", row.names = FALSE)
+
+```
+
+
+```{r, formatting site column and merging data frames}
+#formatting columns
+standardize_site <- function(df) {
+  df$site <- ifelse(grepl("^\\d+$", df$site), paste0("Site_", df$site), gsub("Site_", "", df$site))
+  return(df)
+}
+
+CTRich <- standardize_site(CTRich)
+Water <- standardize_site(Water)
+Vars <- standardize_site(Vars)
+
+# Merge data frames based on the "site" column
+AllVars <- merge(Water, Vars, by = "site", all = TRUE) %>%
+  merge(CTRich, by = "site", all = TRUE) %>%
+  merge(WPClean, by = "site", all = TRUE) %>%
+  merge(FrogsClean, by = "site", all = TRUE)
+
+#list of columns to remove
+colstoremove <- c("NEAR_FC", "type", "DIST_stream.m.", "Total.Recordings")  
+
+#removing columns
+AllVars <- AllVars %>%
+  select(-one_of(colstoremove))
+
+#renaming mammal column
+AllVars <- AllVars %>% 
+  rename (Total_mammals = richness)
+
+#adding total frogs, WP, and mammals
+AllVars <- AllVars %>%
+  mutate(Total_Species = Total_mammals + total_WP + total_frogs)
+
+
+write.csv(AllVars, "./CSV/AllVars.csv", row.names = FALSE)
+```

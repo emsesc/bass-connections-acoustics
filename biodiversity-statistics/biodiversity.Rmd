@@ -1,0 +1,66 @@
+---
+title: "Biodiversity Visualizations"
+output: html_document
+date: "2024-03-31"
+---
+
+Load Data
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(knitr)
+
+ipak <- function(pkg){
+new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+sapply(pkg, require, character.only = TRUE)
+}
+
+# usage
+packages <- c("ggplot2", "ggpubr", "rstatix", "dplyr", "ggthemes", "ggformula", "ggpmisc", "GGally", "arm", "ggstatsplot", "readr")
+ipak(packages)
+
+select <- dplyr::select
+
+AllVars <- read_csv("./AllVarsPAMSitesandBioRich.csv")
+species <- AllVars[, 27:ncol(AllVars)]
+species <- species[!grepl("total", names(species), ignore.case = TRUE)]
+```
+
+Number of Species at Each Site
+
+```{r}
+species_count <- AllVars %>%
+  select(Total_Species, total_Owls, Total_mammals, total_WP, deployment_id.x)
+```
+
+Total Number of Species
+
+```{r}
+# Calculate the sum of selected columns
+species_numbers <- colSums(species)
+```
+
+Significant Difference by Division
+
+*Compute ANVOA*
+
+```{r}
+res.aov <- AllVars %>% anova_test(Total_Species ~ division, detailed = T)
+res.aov
+
+#this is how you do it in base R
+summary(aov(Total_Species ~ division, data = AllVars))
+```
+
+Significant Correlation with trail distance
+
+*Log model*
+
+```{r}
+log.glm = glm(Total_Species ~ NEAR_DIST_DFTrails+NEAR_STREAM, family=gaussian(link="log"), data=AllVars)
+summary(log.glm)
+```

@@ -1,0 +1,590 @@
+---
+title: "Occupancy_stats"
+output: html_document
+date: "2024-03-25"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+ipak <- function(pkg){
+new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+sapply(pkg, require, character.only = TRUE)
+}
+
+# usage
+packages <- c("ggplot2", "ggpubr", "rstatix", "dplyr", "ggthemes", "ggformula", "ggpmisc", "GGally", "arm", "ggstatsplot", "readr")
+ipak(packages)
+
+select <- dplyr::select
+
+```
+
+```{r}
+AllVars <- read_csv("./AllVarsPAMSitesandBioRich.csv")
+```
+
+# Forest Type
+
+## Fishers Run a Fisher's exact test to see if presence
+
+varies across forest types for each species.
+
+```{r}
+binary_vars <- AllVars %>% select(c(bobcat:woodrat.or.rat.species, Colaptes.auratus:Sphyrapicus.varius, Acris.crepitans:Pseudacris.feriarum))
+
+binary_vars <- ifelse(binary_vars ==1, "present", "absent")
+binary_vars <- as.data.frame(binary_vars)
+binary_vars <- binary_vars %>% select(-bobcat, -red.fox, -woodrat.or.rat.species)
+specs <- colnames(binary_vars)
+binary_vars$forest_type <- AllVars$forest_type
+
+
+for (i in 1:length(specs)){
+dat <- binary_vars %>% select(specs[i], forest_type)
+dt <- table(dat)
+dt
+
+test <- fisher.test(dt,workspace = 2e8)
+test
+colnames(dat) <- c("spec", "forest_type")
+Figure <- ggbarstats(
+  dat, spec, forest_type,
+  results.subtitle = FALSE,
+  subtitle = paste0(specs[i],
+    "-- Fisher's exact test", ", p-value = ",
+    ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+  ))
+print(Figure)
+}
+```
+
+##Anova does total species vary across the different forest types? This
+will best be answered with an anova. First let's plot it with a boxplot
+and check our assumptions
+
+##Assumptions ###a) outliers
+
+```{r}
+AllVars %>% 
+  group_by(forest_type) %>%
+  identify_outliers(Total_Species)
+```
+
+There were no extreme outliers.
+
+###b) Normality assumption The normality assumption can be checked by
+using one of the following two approaches:
+
+Analyzing the ANOVA model residuals to check the normality for all
+groups together. This approach is easier and it’s very handy when you
+have many groups or if there are few data points per group.
+
+Check normality for each group separately. This approach might be used
+when you have only a few groups and many data points per group.
+
+Option 1: QQ plot and Shapiro-Wilk test of normality are used. QQ plot
+draws the correlation between a given data and the normal distribution.
+
+```{r}
+# Build the linear model
+model  <- lm(Total_Species ~ forest_type, data = AllVars)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model))
+```
+
+In the QQ plot, as all the points fall approximately along the reference
+line, we can assume normality. This conclusion is supported by the
+Shapiro-Wilk test. The p-value is not significant (p = 0.47), so we can
+assume normality.
+
+Option 2: Check normality assumption by groups. Computing Shapiro-Wilk
+test for each group level. If the data is normally distributed, the
+p-value should be greater than 0.05.
+
+```{r}
+AllVars %>%
+  group_by(forest_type) %>%
+  shapiro_test(Total_Species)
+```
+
+####c) Homogneity of variance assumption The residuals versus fits plot
+can be used to check the homogeneity of variances.
+
+```{r}
+plot(model, 1)
+```
+
+In the plot above, there is no evident relationships between residuals
+and fitted values (the mean of each groups), which is good. So, we can
+assume the homogeneity of variances.
+
+It’s also possible to use the Levene’s test to check the homogeneity of
+variances:
+
+```{r}
+AllVars %>% levene_test(Total_Species ~ forest_type)
+```
+
+From the output above, we can see that the p-value is \> 0.05, which is
+not significant. This means that, there is not significant difference
+between variances across groups. Therefore, we can assume the
+homogeneity of variances in the different treatment groups.
+
+###1.2 Compute ANVOA
+
+```{r}
+res.aov <- AllVars %>% anova_test(Total_Species ~ forest_type, detailed = T)
+res.aov
+
+#this is how you do it in base R
+summary(aov(Total_Species ~ forest_type, data = AllVars))
+```
+
+It appears there is no significant difference by forest type. What about
+by division?
+
+#Division ##Fishers
+
+Run a Fisher's exact test to see if presence varies across division for
+each species.
+
+```{r}
+binary_vars <- AllVars %>% select(c(bobcat:woodrat.or.rat.species, Colaptes.auratus:Sphyrapicus.varius, Acris.crepitans:Pseudacris.feriarum))
+
+binary_vars <- ifelse(binary_vars ==1, "present", "absent")
+binary_vars <- as.data.frame(binary_vars)
+binary_vars <- binary_vars %>% select(-bobcat, -red.fox, -woodrat.or.rat.species)
+specs <- colnames(binary_vars)
+binary_vars$division <- AllVars$division
+
+
+for (i in 1:length(specs)){
+dat <- binary_vars %>% select(specs[i], division)
+dt <- table(dat)
+dt
+
+test <- fisher.test(dt,workspace = 2e8)
+test
+colnames(dat) <- c("spec", "division")
+Figure <- ggbarstats(
+  dat, spec, division,
+  results.subtitle = FALSE,
+  subtitle = paste0(specs[i],
+    "-- Fisher's exact test", ", p-value = ",
+    ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+  ))
+print(Figure)
+}
+```
+
+##Anova does total species vary across the different divisions? This
+will best be answered with an anova. First let's plot it with a boxplot
+and check our assumptions
+
+##Assumptions ###a) outliers
+
+```{r}
+AllVars %>% 
+  group_by(division) %>%
+  identify_outliers(Total_Species)
+```
+
+There were no extreme outliers.
+
+###b) Normality assumption The normality assumption can be checked by
+using one of the following two approaches:
+
+Analyzing the ANOVA model residuals to check the normality for all
+groups together. This approach is easier and it’s very handy when you
+have many groups or if there are few data points per group.
+
+Check normality for each group separately. This approach might be used
+when you have only a few groups and many data points per group.
+
+Option 1: QQ plot and Shapiro-Wilk test of normality are used. QQ plot
+draws the correlation between a given data and the normal distribution.
+
+```{r}
+# Build the linear model
+model  <- lm(Total_Species ~ division, data = AllVars)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model))
+```
+
+In the QQ plot, as all the points fall approximately along the reference
+line, we can assume normality. This conclusion is supported by the
+Shapiro-Wilk test. The p-value is not significant (p = 0.47), so we can
+assume normality.
+
+Option 2: Check normality assumption by groups. Computing Shapiro-Wilk
+test for each group level. If the data is normally distributed, the
+p-value should be greater than 0.05.
+
+```{r}
+AllVars %>%
+  group_by(division) %>%
+  shapiro_test(Total_Species)
+```
+
+####c) Homogneity of variance assumption The residuals versus fits plot
+can be used to check the homogeneity of variances.
+
+```{r}
+plot(model, 1)
+```
+
+In the plot above, there is no evident relationships between residuals
+and fitted values (the mean of each groups), which is good. So, we can
+assume the homogeneity of variances.
+
+It’s also possible to use the Levene’s test to check the homogeneity of
+variances:
+
+```{r}
+AllVars %>% levene_test(Total_Species ~ division)
+```
+
+From the output above, we can see that the p-value is \> 0.05, which is
+not significant. This means that, there is not significant difference
+between variances across groups. Therefore, we can assume the
+homogeneity of variances in the different treatment groups.
+
+## Compute ANVOA
+
+```{r}
+res.aov <- AllVars %>% anova_test(Total_Species ~ division, detailed = T)
+res.aov
+
+#this is how you do it in base R
+summary(aov(Total_Species ~ division, data = AllVars))
+```
+
+It appears there is a significant difference by division!
+
+## Post Hoc Test
+
+A significant one-way ANOVA is generally followed up by Tukey post-hoc
+tests to perform multiple pairwise comparisons between groups. Key R
+function: tukey_hsd() [rstatix].
+
+```{r}
+# Pairwise comparisons
+pwc <- AllVars %>% tukey_hsd(Total_Species ~ division) 
+pwc
+```
+
+The output contains the following columns:
+
+estimate: estimate of the difference between means of the two groups
+conf.low, conf.high: the lower and the upper end point of the confidence
+interval at 95% (default) p.adj: p-value after adjustment for the
+multiple comparisons.
+
+```{r}
+# Visualization: box plots with p-values
+pwc <- pwc %>% add_xy_position(x = "division")
+ggboxplot(AllVars, x = "division", y = "Total_Species") +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(res.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+    )
+```
+
+#Logistic Regression Is species presence/absence explained by our
+environmental variables.
+
+Let's take spring peeper as an example. I will run a logistic
+regression, test the assumptions, and examine a few models, selecting
+the best one by looking at AIC.
+
+##Plot it out
+
+```{r}
+library(tidyverse)
+
+mydata <- AllVars %>% dplyr::select(Pseudacris.feriarum, division, c(forest_type:NEAR_DIST_MajorRoads), Pseudacris.crucifer, NEAR_POND, NEAR_WETLAND)
+mydata <- mydata %>% mutate(Pseudacris.feriarum = as.factor(Pseudacris.feriarum))
+mydata_long <- mydata %>% pivot_longer(c(NEAR_POND:Pseudacris.crucifer))
+
+
+#Create the Scatter Plots:
+mydata_long %>% ggplot(aes(y=value, x = Pseudacris.feriarum)) + geom_boxplot()+
+  facet_wrap(~name, scales = "free_y")
+
+
+```
+
+##Simple Logistic regression
+
+```{r}
+simp_logit <- glm(Pseudacris.feriarum~NEAR_WETLAND,data=mydata,family="binomial"(link=logit))
+summary(simp_logit)
+```
+
+Fitting this model looks very similar to fitting a simple linear
+regression. Instead of lm() we use glm(). The only other difference is
+the use of family = "binomial" which indicates that we have a two-class
+categorical response. Using glm() with family = "gaussian" would perform
+the usual linear regression.
+
+As you can see in the output, NEAR_WETLAND is significantly and
+negatively associated with the odds of P feriarum presence. For every 1m
+increase in distance, the log odds of p ferarium presence decrease by
+.008. This is not very meaningful to me, lets transform it to odds ratio
+
+```{r}
+exp(coef(simp_logit))
+```
+
+So the odds-ratio is .99. This means for every increase of 1m in
+NEAR_WETLAND, probability of presence goes down by 1%. If the odds-ratio
+was exactly 1, that would indicate an equal odds (i.e. the variable
+would not be associated with the event), and odds-ratios above 1
+indicate the chance increasing as the variable increases.
+
+This makes sense because this is distance to nearest wetland, as that
+number increases, the frogs are further from wetlands.
+
+###Assumptions \#### Linearity Option 1: boxTidwell
+
+TheBox-Tidwell test is used to check for linearity between the
+predictors and the logit. This is done by adding log-transformed
+interaction terms between the continuous independent variables and their
+corresponding natural log into the model.
+
+It checks whether the logit transform is a linear function of the
+predictor, effectively adding the non-linear transform of the original
+predictor as an interaction term to test if this addition made no better
+prediction. A statistically significant p-value of the interaction term
+in the Box-Tidwell transformation means that the linearity assumption is
+violated
+
+```{r}
+mydata$log_wetland <- log(mydata$NEAR_WETLAND)
+mydata$log_wetland <- ifelse(mydata$log_wetland == "-Inf", 0, mydata$log_wetland)
+
+
+summary(glm( Pseudacris.feriarum~NEAR_WETLAND*log_wetland, data = mydata, family = "binomial"(link="logit"), na.action=na.exclude))
+```
+
+##Multiple logistic regression Lets run a model with multiple
+variables - I think division, NEAR_WETLAND and the presence of another
+frog species (Pseudacris.crucifer) ###Assumptions ####Multicollinearity
+Lets check and make sure the VIF isn't too high for variables, if it is,
+we will remove them.
+
+I'll build a model with all of our variables JUST for this part (we
+don't have enough data to build this large of a model)
+
+```{r}
+full_mod <- glm(Pseudacris.feriarum~., data = mydata, family = "binomial"(link="logit"), na.action=na.exclude)
+car::vif(full_mod)
+```
+
+It looks like division, Dist_footrails.m, Dist_DFroads.m. and the water
+variables have high VIFs I'm going to loop through all of our variables
+and rank them based on deviance explained then remove those that are
+correlated with eachother and have a lower log likelihood (or higher
+AIC)
+
+```{r}
+xnames <- mydata  %>% select(-Pseudacris.feriarum)
+xnames <- colnames(xnames)
+
+dev_table <- data.frame(matrix(ncol=3, nrow=1))
+colnames(dev_table) <- c("names", "log_lik", "aic")
+
+for (i in 1:length(xnames)) { #for each species in spec_list
+  tryCatch({ fit <- glm(as.formula(paste("Pseudacris.feriarum ~ ", xnames[i])), data=mydata, family=binomial(link = "logit"))
+  log_lik <- logLik(fit)[1]
+  aic <- AIC(fit)
+  dev_table[i,1] <- xnames[i]
+  dev_table[i,2] <- log_lik
+  dev_table[i,3] <- aic
+  
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+
+```
+
+It looks like distance major roads and near wetland explain the most,
+lets keep in forest type and near_pond and check the VIF again
+
+```{r}
+full_mod <- glm(Pseudacris.feriarum~DIST_majorroads.m. + NEAR_WETLAND + NEAR_POND+ forest_type + division, data = mydata, family = "binomial"(link="logit"), na.action=na.exclude)
+car::vif(full_mod)
+```
+
+VIF here looks fine
+
+####3.4.2.1 AIC lets compare all of the possible models with those x
+variables based on AIC (AIC will penalize for oversaturated models)
+
+```{r}
+library(gtools)
+pastePerm<- function(row, names){
+  keep<- which(row==1)
+  if(length(keep)==0){
+    return('1')
+  }else{
+    return(paste(names[keep],collapse='+'))
+  }
+}
+my_sqrt <- function(var1){
+  sqrt(var1)
+}
+
+dredgeform<- function(pred, covars, alwaysIn=''){
+  p<- length(covars)
+  perm.tab<- permutations(2, p, v=c(0,1), repeats.allowed=T)
+  myforms<- NULL
+  for(j in 1:nrow(perm.tab)){
+    myforms[j]<- pastePerm(perm.tab[j,], covars)
+  }
+  myforms<- paste0(pred, '~',myforms)
+  return(myforms)
+}
+
+allformulas<- dredgeform(pred = "Pseudacris.feriarum", covars = c("DIST_majorroads.m.","NEAR_WETLAND","NEAR_POND","forest_type" ,"division"))
+
+
+```
+
+```{r}
+
+set.seed(123)
+compare_var <- as.data.frame(matrix(ncol = 2, nrow = 0))
+colnames(compare_var) <- c("formula", "AIC")
+
+for ( i in 1:length(allformulas)) {
+
+model <- glm(as.formula(allformulas[i]), data = mydata, family = "binomial"(link= logit))
+
+# Summarize the results
+compare_var[i, 1] <- allformulas[i]
+compare_var[i, 2] <- AIC(model)
+}
+
+compare_var %>% arrange(AIC)
+
+```
+
+From this I would infer that our minimum adequate model is
+DIST_majorroads.m.+NEAR_WETLAND
+
+Lets run that model and interpret results.
+
+```{r}
+our_mod <- glm(Pseudacris.feriarum~DIST_majorroads.m. + NEAR_WETLAND, data = mydata, family = "binomial"(link="logit"), na.action=na.exclude)
+summary(our_mod)
+```
+
+while not quite significant at the p \<.05 level, still important
+results. The minimum adequate model for understanding P feriarum
+presence includes distance to major roads and distance to wetlands with
+each associated with decreased probabilty of presence of P feriarum.
+
+#Multiple regression on Total Species what if we want to look at total
+species as a function of these environmental variables? This would be a
+linear regression which has its own assumptions
+
+create a histogram of the data to see what distribution we should use
+
+```{r}
+library("fitdistrplus")
+fitp <- fitdist(AllVars$Total_Species, "pois", method = "mle")
+fitnb <- fitdist(AllVars$Total_Species, "nbinom", method = "mle")
+fitnorm <- fitdist(AllVars$Total_Species, "norm", method = "mle")
+fitlognorm <- fitdist(AllVars$Total_Species, "lnorm", method = "mle")
+fitgamma <- fitdist(AllVars$Total_Species, "gamma", method = "mle")
+denscomp(list(fitp, fitnb, fitnorm, fitlognorm, fitgamma),demp = TRUE, fittype = "o", dempcol = "black",
+  legendtext = c("Poisson", "negative binomial", "gaussian", "log normal", "gamma"))
+
+```
+
+I think the log normal fits the data best
+
+```{r}
+log.glm = glm(Total_Species ~ NEAR_WETLAND, family=gaussian(link="log"), data=AllVars)
+summary(log.glm)
+```
+
+Lets do the same thing, looping through the variables and getting out
+log likelihood and AIC to select which variables we want to model
+
+```{r}
+xnames <- AllVars  %>% select(division, forest_type:NEAR_DIST_MajorRoads)
+xnames <- colnames(xnames)
+
+dev_table <- data.frame(matrix(ncol=3, nrow=1))
+colnames(dev_table) <- c("names", "log_lik", "aic")
+
+for (i in 1:length(xnames)) { #for each species in spec_list
+  tryCatch({ fit <- glm(as.formula(paste("Total_Species ~ ", xnames[i])), data=AllVars, family=gaussian(link="log"))
+  log_lik <- logLik(fit)[1]
+  aic <- AIC(fit)
+  dev_table[i,1] <- xnames[i]
+  dev_table[i,2] <- log_lik
+  dev_table[i,3] <- aic
+  
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+
+```
+
+Lets take the best variables Dist_footrails.m., division, NEAR_STREAM
+and find the best model from AIC
+
+```{r}
+allformulas<- dredgeform(pred = "Total_Species", covars = c("NEAR_DIST_DFTrails", "division", "NEAR_STREAM"))
+
+set.seed(123)
+compare_var <- as.data.frame(matrix(ncol = 2, nrow = 0))
+colnames(compare_var) <- c("formula", "AIC")
+
+for ( i in 1:length(allformulas)) {
+
+model <- glm(as.formula(allformulas[i]), data = AllVars, family=gaussian(link="log"))
+
+# Summarize the results
+compare_var[i, 1] <- allformulas[i]
+compare_var[i, 2] <- AIC(model)
+}
+
+compare_var %>% arrange(AIC)
+
+```
+
+Dist_footrails.m. and Dist_footrails.m.+NEAR_STREAM have very similar
+AIC lets look at the model summary
+
+```{r}
+log.glm = glm(Total_Species ~ NEAR_DIST_DFTrails+NEAR_STREAM, family=gaussian(link="log"), data=AllVars)
+summary(log.glm)
+```
+
+It looks like there are more animals further from foot trails (as
+distance to nearest foot trail increases, so does total animals)
+
+##Assumptions check our model assumptions here
+
+```{r}
+log.glm = lm(log(Total_Species) ~ Dist_footrails.m.+NEAR_STREAM, data=AllVars)
+summary(log.glm)
+
+library(gvlma)
+gvlma(log.glm)
+```
