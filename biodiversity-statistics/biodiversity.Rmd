@@ -11,6 +11,7 @@ library(dplyr)
 library(tidyverse)
 library(tidyr)
 library(knitr)
+library(car)
 
 ipak <- function(pkg){
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
@@ -34,7 +35,7 @@ Number of Species at Each Site
 
 ```{r}
 species_count <- AllVars %>%
-  select(Total_Species, total_Owls, Total_mammals, total_WP, site)
+  select(site, Total_Species, total_Owls, Total_mammals, total_WP, total_frogs)
 ```
 
 Total Number of Species
@@ -46,29 +47,24 @@ species_numbers <- as.data.frame(colSums(species))
 
 Significant Difference by Division (add box plot)
 
-*Compute ANVOA*
+*Compute ANVOA + Tukey*
 
 ```{r}
-res.aov <- AllVars %>% anova_test(Total_Species ~ division, detailed = T)
-res.aov
+pwc <- AllVars %>% tukey_hsd(Total_Species ~ division) 
+pwc
 
-#this is how you do it in base R
-summary(aov(Total_Species ~ division, data = AllVars))
-```
-
-```{r}
-# Load the ggplot2 library
-library(ggplot2)
-
-# Assuming your data frame is named AllVars, and the variables are Division and Total_Species
-# Replace "YourDataFrame" with the name of your actual data frame
-
-# Create the box plot
-ggplot(AllVars, aes(x = division, y = Total_Species)) +
-  geom_boxplot(fill = "skyblue", color = "blue") +
-  labs(title = "Box Plot of Total Species by Division",
+pwc <- pwc %>% add_xy_position(x = "division")
+ggboxplot(fill = "skyblue", color = "blue", AllVars, x = "division", y = "Total_Species") +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) +
+  labs(title = "Total Species by Division",
        x = "Division",
-       y = "Total Species")
+       y = "Total Species",
+       subtitle = get_test_label(res.aov, detailed = TRUE),
+       caption = get_pwc_label(pwc)
+    ) +
+  scale_x_discrete(labels = c("Korstian", "Blackwood", "Durham"))
+
+# make these capital
 ```
 
 Significant Correlation with trail distance (scatter plot)
@@ -78,15 +74,12 @@ Significant Correlation with trail distance (scatter plot)
 ```{r}
 log.glm = glm(Total_Species ~ NEAR_DIST_DFTrails+NEAR_STREAM, family=gaussian(link="log"), data=AllVars)
 summary(log.glm)
-```
 
-```{r}
-# Scatter plot of Total_Species against NEAR_DIST_DFTrails
-plot(AllVars$NEAR_DIST_DFTrails, AllVars$Total_Species, 
-     xlab = "NEAR_DIST_DFTrails", ylab = "Total_Species", 
-     main = "Scatter plot with Fitted Line")
+av_plots <- avPlots(log.glm)
 
-# Add the fitted line
-abline(log.glm$coefficients["(Intercept)"], log.glm$coefficients["NEAR_DIST_DFTrails"], 
-       col = "red")
+update(av_plots$NEAR_DIST_DFTrails, xlab = "Distance from Nearest Trail", ylab = "Species Count")
+update(av_plots$NEAR_STREAM, xlab = "Distance from Nearest Stream", ylab = "Species Count")
+
+av_plots
+# Change row labels
 ```
